@@ -1,0 +1,18 @@
+asyncapi: 2.6.0
+info:
+  title: User Domain Events
+  version: 1.0.0
+  description: Events for updates to user domain entities
+channels:
+  user.domain.updated:
+    description: User domain data changed (CDC or enrichment event)
+    subscribe:
+      message:
+        contentType: application/json
+        name: UserDomainUpdated
+        payload:
+          $ref: '#/components/schemas/UserDomain'
+components:
+  schemas:
+    UserDomain:
+      $ref: 'https://example.com/schemas/user_profile_service.json'

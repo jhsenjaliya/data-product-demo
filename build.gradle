@@ -1,0 +1,28 @@
+plugins {
+    id 'java'
+}
+
+group = 'org.jaysen'
+version = '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation("org.apache.kafka:kafka-streams:3.6.0")
+    implementation("org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.5.0")
+    implementation("org.apache.spark:spark-core_2.12:3.5.1")
+    implementation("org.apache.spark:spark-sql_2.12:3.5.1")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.15.3")
+    implementation("com.datastax.oss:java-driver-core:4.17.0") // For ScyllaDB
+    implementation("org.slf4j:slf4j-simple:2.0.9")
+
+
+    testImplementation platform('org.junit:junit-bom:5.10.0')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+}
+
+test {
+    useJUnitPlatform()
+}

@@ -1,0 +1,79 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "UserDomain",
+  "type": "object",
+  "properties": {
+    "user_id": { "type": "string", "format": "uuid" },
+
+    "profile": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "created_at": { "type": "string", "format": "date-time" }
+      }
+    },
+
+    "preferences": {
+      "type": "object",
+      "properties": {
+        "language": { "type": "string" },
+        "timezone": { "type": "string" }
+      }
+    },
+
+    "auth": {
+      "type": "object",
+      "properties": {
+        "hashed_password": { "type": "string" },
+        "login_attempts": { "type": "integer" }
+      }
+    },
+
+    "addresses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "number": { "type": "string" },
+          "street": { "type": "string" },
+          "city": { "type": "string" },
+          "region": { "type": "string" },
+          "postcode": { "type": "string" }
+        }
+      }
+    },
+
+    "status": {
+      "type": "object",
+      "properties": {
+        "account_status": { "type": "string", "enum": ["ACTIVE", "SUSPENDED", "DELETED"] },
+        "last_updated": { "type": "string", "format": "date-time" }
+      }
+    },
+
+    "consent": {
+      "type": "object",
+      "properties": {
+        "gdpr": { "type": "boolean" },
+        "marketing_opt_in": { "type": "boolean" }
+      }
+    },
+
+    "compliance": {
+      "type": "object",
+      "properties": {
+        "kyc_status": { "type": "string" },
+        "aml_checked": { "type": "boolean" }
+      }
+    },
+
+    "internal_metadata": {
+      "type": "object",
+      "properties": {
+        "ingestion_source": { "type": "string" },
+        "processing_flags": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}
