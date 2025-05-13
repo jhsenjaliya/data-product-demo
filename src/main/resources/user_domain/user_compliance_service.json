@@ -1,16 +1,29 @@
 {
+  "$id": "https://example.com/user/compliance.schema.json",
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "UserDomain",
   "type": "object",
+  "title": "UserCompliance",
   "properties": {
-    "user_id": { "type": "string", "format": "uuid" },
-
-    "compliance": {
-      "type": "object",
-      "properties": {
-        "kyc_status": { "type": "string" },
-        "aml_checked": { "type": "boolean" }
-      }
+    "kyc_status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "verified",
+        "failed"
+      ]
+    },
+    "aml_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "last_checked": {
+      "type": "string",
+      "format": "date-time"
     }
-  }
+  },
+  "required": [
+    "kyc_status",
+    "last_checked"
+  ]
 }

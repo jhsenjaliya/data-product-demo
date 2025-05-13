@@ -1,81 +1,122 @@
 package org.jaysen;
 
+import org.apache.kafka.common.serialization.Serdes;
+import org.apache.kafka.streams.*;
+import org.apache.kafka.streams.kstream.*;
+import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+import java.io.*;
+import java.nio.file.*;
+import java.util.*;
+
 public class BusinessEventBuilder {
-    public static void main(String[] args) {
-        // Simplified illustration of enrichment and snapshot logic
 
-        builder.stream("user-domain-cdc-events")
-                .foreach((key, cdcEvent) -> {
-                    String userId = cdcEvent.getPayload().get("user_id").asText();
+    private static final Map<String, String> streetToZip = new HashMap<>();
 
-// Query latest full user data from ScyllaDB
-                    try (CqlSession session = CqlSession.builder().build()) {
-                        Row userRow = session.execute(
-                                SimpleStatement.newInstance("SELECT * FROM user_domain WHERE user_id = ?", UUID.fromString(userId))
-                        ).one();
+    public static void main(String[] args) throws Exception {
+        // Load ZIP enrichment map from GeoJSON
+        loadZipCodesFromGeoJson("infra/openaddresses/source.geojson");
 
-                        List<Row> addressRows = session.execute(
-                                SimpleStatement.newInstance("SELECT * FROM user_addresses WHERE user_id = ?", UUID.fromString(userId))
-                        ).all();
+        Properties props = new Properties();
+        props.put(StreamsConfig.APPLICATION_ID_CONFIG, "user-domain-enrichment-app");
+        props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+        props.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass());
+        props.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass());
 
-                        ObjectMapper mapper = new ObjectMapper();
-                        ObjectNode fullEvent = mapper.createObjectNode();
-                        fullEvent.put("user_id", userId);
+        StreamsBuilder builder = new StreamsBuilder();
+        ObjectMapper mapper = new ObjectMapper();
 
-// Build user profile
-                        ObjectNode profile = mapper.createObjectNode();
-                        profile.put("name", userRow.getString("profile_name"));
-                        profile.put("email", userRow.getString("profile_email"));
-                        fullEvent.set("profile", profile);
+        KTable<String, JsonNode> profileTable = builder.table("user_domain.public.user_profile", Consumed.with(Serdes.String(), new JsonSerde()));
+        KTable<String, JsonNode> preferencesTable = builder.table("user_domain.public.user_preferences", Consumed.with(Serdes.String(), new JsonSerde()));
+        KTable<String, JsonNode> privacyTable = builder.table("user_domain.public.user_privacy", Consumed.with(Serdes.String(), new JsonSerde()));
+        KTable<String, JsonNode> complianceTable = builder.table("user_domain.public.user_compliance", Consumed.with(Serdes.String(), new JsonSerde()));
 
-// Preferences
-                        ObjectNode preferences = mapper.createObjectNode();
-                        preferences.put("language", userRow.getString("preferences_language"));
-                        preferences.put("timezone", userRow.getString("preferences_timezone"));
-                        fullEvent.set("preferences", preferences);
+        // Enrich address with ZIP
+        KTable<String, JsonNode> enrichedProfile = profileTable.mapValues(profile -> {
+            ObjectNode obj = (ObjectNode) profile.deepCopy();
+            if (obj.has("current_address")) {
+                String address = obj.get("current_address").asText();
+                String zip = enrichZipFromAddress(address);
+                obj.put("zipcode", zip);
+            }
+            return obj;
+        });
 
-// Enrich addresses with postcode from GeoJSON lookup
-                        ArrayNode addressesArray = mapper.createArrayNode();
-                        for (Row addr : addressRows) {
-                            ObjectNode addrNode = mapper.createObjectNode();
-                            addrNode.put("street", addr.getString("street"));
-                            addrNode.put("city", addr.getString("city"));
-                            addrNode.put("region", addr.getString("region"));
+        KTable<String, JsonNode> joined = enrichedProfile
+                .leftJoin(preferencesTable, (profile, prefs) -> merge(profile, prefs, "preferences"))
+                .leftJoin(privacyTable, (combined, privacy) -> merge(combined, privacy, "privacy"))
+                .leftJoin(complianceTable, (combined, compliance) -> merge(combined, compliance, "compliance"));
 
-// GeoJSON-based postcode enrichment
-                            String postcode = GeoJsonLookup.getPostcode(
-                                    addr.getString("street"), addr.getString("city"), addr.getString("region")
-                            );
-                            addrNode.put("postcode", postcode);
+        joined.toStream().to("user_domain.business_event", Produced.with(Serdes.String(), new JsonSerde()));
 
-                            addressesArray.add(addrNode);
-                        }
-                        fullEvent.set("addresses", addressesArray);
+        KafkaStreams streams = new KafkaStreams(builder.build(), props);
+        streams.start();
 
-// Producer-side metric
-                        fullEvent.put("profile_completion_score", (profile.size() + preferences.size()) * 20);
-                        fullEvent.put("event_timestamp", Instant.now().toString());
+        Runtime.getRuntime().addShutdownHook(new Thread(streams::close));
+    }
 
-                        // Publish to Kafka full event topic
-                        kafkaProducer.send(new ProducerRecord<>("user-domain-full-events", userId, fullEvent.toString()));
+    private static void loadZipCodesFromGeoJson(String filePath) throws IOException {
+        ObjectMapper mapper = new ObjectMapper();
+        InputStream in = BusinessEventBuilder.class.getClassLoader().getResourceAsStream(filePath);
+        JsonNode root = mapper.readTree(in);
+        for (JsonNode feature : root.withArray("features")) {
+            JsonNode props = feature.get("properties");
+            if (props == null) continue;
+            String street = Optional.ofNullable(props.get("STREET")).map(JsonNode::asText).orElse("").toLowerCase().trim();
+            String city = Optional.ofNullable(props.get("CITY")).map(JsonNode::asText).orElse("").toLowerCase().trim();
+            String zip = Optional.ofNullable(props.get("POSTCODE")).map(JsonNode::asText).orElse("").trim();
 
-                        // Write snapshot to ScyllaDB warehouse table
-                        session.execute(
-                                SimpleStatement.newInstance(
-                                        "INSERT INTO user_domain_snapshot (user_id, snapshot_json, event_time) VALUES (?, ?, ?)",
-                                        UUID.fromString(userId),
-                                        fullEvent.toString(),
-                                        Instant.now()
-                                )
-                        );
+            if (city.equals("san jose") && !street.isEmpty() && !zip.isEmpty()) {
+                streetToZip.putIfAbsent(street, zip);
+            }
+        }
+    }
 
-                    } catch (Exception e) {
-                        // Exception handling
-                    }
-                });
+    private static String enrichZipFromAddress(String address) {
+        String addr = address.toLowerCase();
+        if (!addr.contains("san jose")) return "00000";
 
+        for (Map.Entry<String, String> entry : streetToZip.entrySet()) {
+            if (addr.contains(entry.getKey())) {
+                return entry.getValue();
+            }
+        }
+        return "00000";
+    }
+
+    private static JsonNode merge(JsonNode base, JsonNode addition, String fieldName) {
+        ObjectNode result = base.deepCopy();
+        if (addition != null && !addition.isNull()) {
+            result.set(fieldName, addition);
+        }
+        return result;
+    }
+
+    // JsonSerde implementation or import from Confluent / your SerDe registry
+    public static class JsonSerde extends Serdes.WrapperSerde<JsonNode> {
+        public JsonSerde() {
+            super(new JsonSerializer(), new JsonDeserializer());
+        }
+    }
+
+    public static class JsonSerializer implements org.apache.kafka.common.serialization.Serializer<JsonNode> {
+        private final ObjectMapper mapper = new ObjectMapper();
+        public byte[] serialize(String topic, JsonNode data) {
+            try { return mapper.writeValueAsBytes(data); }
+            catch (Exception e) { throw new RuntimeException(e); }
+        }
+    }
+
+    public static class JsonDeserializer implements org.apache.kafka.common.serialization.Deserializer<JsonNode> {
+        private final ObjectMapper mapper = new ObjectMapper();
+        public JsonNode deserialize(String topic, byte[] data) {
+            try { return mapper.readTree(data); }
+            catch (Exception e) { throw new RuntimeException(e); }
+        }
     }
 }
+
 
 
 

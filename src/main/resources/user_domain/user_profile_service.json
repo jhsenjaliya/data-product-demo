@@ -1,79 +1,30 @@
 {
+  "$id": "https://example.com/user/profile.schema.json",
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "UserDomain",
   "type": "object",
+  "required": [
+    "user_id",
+    "full_name",
+    "email"
+  ],
   "properties": {
-    "user_id": { "type": "string", "format": "uuid" },
-
-    "profile": {
-      "type": "object",
-      "properties": {
-        "name": { "type": "string" },
-        "email": { "type": "string", "format": "email" },
-        "created_at": { "type": "string", "format": "date-time" }
-      }
+    "user_id": {
+      "type": "string"
     },
-
-    "preferences": {
-      "type": "object",
-      "properties": {
-        "language": { "type": "string" },
-        "timezone": { "type": "string" }
-      }
+    "full_name": {
+      "type": "string"
     },
-
-    "auth": {
-      "type": "object",
-      "properties": {
-        "hashed_password": { "type": "string" },
-        "login_attempts": { "type": "integer" }
-      }
+    "email": {
+      "type": "string",
+      "format": "email"
     },
-
-    "addresses": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "number": { "type": "string" },
-          "street": { "type": "string" },
-          "city": { "type": "string" },
-          "region": { "type": "string" },
-          "postcode": { "type": "string" }
-        }
-      }
+    "dob": {
+      "type": "string",
+      "format": "date"
     },
-
-    "status": {
-      "type": "object",
-      "properties": {
-        "account_status": { "type": "string", "enum": ["ACTIVE", "SUSPENDED", "DELETED"] },
-        "last_updated": { "type": "string", "format": "date-time" }
-      }
-    },
-
-    "consent": {
-      "type": "object",
-      "properties": {
-        "gdpr": { "type": "boolean" },
-        "marketing_opt_in": { "type": "boolean" }
-      }
-    },
-
-    "compliance": {
-      "type": "object",
-      "properties": {
-        "kyc_status": { "type": "string" },
-        "aml_checked": { "type": "boolean" }
-      }
-    },
-
-    "internal_metadata": {
-      "type": "object",
-      "properties": {
-        "ingestion_source": { "type": "string" },
-        "processing_flags": { "type": "array", "items": { "type": "string" } }
-      }
+    "phone": {
+      "type": "string"
     }
   }
 }
