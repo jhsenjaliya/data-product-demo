@@ -4,19 +4,17 @@ import org.apache.spark.sql.*;
 import org.apache.spark.sql.streaming.StreamingQuery;
 import org.apache.spark.sql.streaming.StreamingQueryException;
 import org.apache.spark.sql.streaming.Trigger;
-import org.apache.spark.sql.types.DataTypes;
-import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 
 import java.util.concurrent.TimeoutException;
 
 import static org.apache.spark.sql.functions.*;
 
-public class KafkaToIcebergWriter {
+public class EventsToTableGeneratorService {
 
     public static void main(String[] args) throws StreamingQueryException, TimeoutException {
         SparkSession spark = SparkSession.builder()
-                .appName("KafkaToIcebergWriter")
+                .appName("EventsToTableGeneratorService")
 //                .config("spark.sql.catalog.spark_catalog", "org.apache.iceberg.spark.SparkCatalog")
 //                .config("spark.sql.catalog.spark_catalog.type", "hadoop")
 //                .config("spark.sql.catalog.spark_catalog.warehouse", "warehouse")
@@ -31,7 +29,7 @@ public class KafkaToIcebergWriter {
                 .format("kafka")
                 .option("kafka.bootstrap.servers", "localhost:9092")
                 .option("subscribe", "user_domain.business_event")
-                .option("startingOffsets", "earliest")
+                .option("startingOffsets", "latest")
                 .load();
 
         Dataset<Row> parsed = kafkaRaw.selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)")
@@ -56,7 +54,7 @@ public class KafkaToIcebergWriter {
         StreamingQuery snapshotQuery = parsed.writeStream()
                 .format("iceberg")
                 .outputMode("append")
-                .option("checkpointLocation", "/Users/jsenjaliya/data/spark_data/checkpoints/user_profile_snapshot")
+                .option("checkpointLocation", "checkpoints/user_profile_snapshot")
                 .toTable("local.user_domain.user_profile_snapshot");
 //                .option("table", "local.user_domain.user_profile_snapshot")
 //                .start();
@@ -80,7 +78,7 @@ public class KafkaToIcebergWriter {
                                     "WHEN NOT MATCHED THEN INSERT *"
                     );
                 })
-                .option("checkpointLocation", "/Users/jsenjaliya/data/spark_data/checkpoints/user_profile_latest")
+                .option("checkpointLocation", "checkpoints/user_profile_latest")
                 .trigger(Trigger.ProcessingTime("30 seconds"))
                 .start();
 

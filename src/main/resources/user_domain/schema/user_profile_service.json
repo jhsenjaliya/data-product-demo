@@ -4,15 +4,15 @@
   "title": "UserDomain",
   "type": "object",
   "required": [
-    "user_id",
+    "id",
     "full_name",
     "email"
   ],
   "properties": {
-    "user_id": {
+    "id": {
       "type": "string"
     },
-    "full_name": {
+    "name": {
       "type": "string"
     },
     "email": {
@@ -24,6 +24,9 @@
       "format": "date"
     },
     "phone": {
+      "type": "string"
+    },
+    "address": {
       "type": "string"
     }
   }

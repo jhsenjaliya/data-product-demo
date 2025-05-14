@@ -5,3 +5,8 @@ bin/kafka-topics.sh --create --topic user-domain-full-events --bootstrap-server 
 
 bin/kafka-topics.sh --list --bootstrap-server localhost:9092
 bin/kafka-topics.sh --describe --topic cities --bootstrap-server localhost:9092
+
+
+ kafka-streams-application-reset --application-id user-business-events-builder-5 \
+                                      --input-topics user_domain.public.user_compliance, user_domain.public.user_preferences, user_domain.public.user_privacy, user_domain.public.user_profile \
+                                      --bootstrap-servers localhost:9092 --force

@@ -26,6 +26,18 @@
           "push"
         ]
       }
+    },
+    "notification_time": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "morning",
+          "daytime",
+          "evening",
+          "night"
+        ]
+      }
     }
   },
   "required": [
