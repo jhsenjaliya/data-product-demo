@@ -17,7 +17,7 @@ dependencies {
     implementation("com.fasterxml.jackson.core:jackson-databind:2.15.3")
     implementation("com.datastax.oss:java-driver-core:4.17.0") // For ScyllaDB
     implementation("org.slf4j:slf4j-simple:2.0.9")
-
+    implementation("org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1")
 
     testImplementation platform('org.junit:junit-bom:5.10.0')
     testImplementation 'org.junit.jupiter:junit-jupiter'
